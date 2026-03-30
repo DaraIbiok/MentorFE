@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -23,32 +23,41 @@ const STEPS = [
 ];
 
 type FormData = {
-  // Step 1
   phoneNumber: string;
   location: string;
   gender: string;
-  // Step 2
   jobTitle: string;
   company: string;
   yearsExperience: string;
   linkedinUrl: string;
   skills: string[];
   professionalBio: string;
-  // Step 3
   idDocument: File | null;
   idDocumentType: string;
   certificate: File | null;
 };
 
 type ApplicationStatus = {
-  id: string;
+  id: string | null;
   mentorId: string;
   status: string;
   step1Completed: boolean;
   step2Completed: boolean;
   step3Completed: boolean;
   submittedAt: string | null;
-  createdAt: string;
+  createdAt: string | null;
+  phoneNumber?: string;
+  location?: string;
+  gender?: string;
+  jobTitle?: string;
+  company?: string;
+  yearsExperience?: number;
+  linkedinUrl?: string;
+  skills?: string[];
+  professionalBio?: string;
+  idDocumentUrl?: string;
+  idDocumentType?: string;
+  professionalCertificateUrl?: string;
 };
 
 async function uploadDoc(file: File, subfolder: string): Promise<string> {
@@ -68,6 +77,7 @@ async function uploadDoc(file: File, subfolder: string): Promise<string> {
 
 export default function MentorApplication() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, refreshUser, isAuthenticated } = useAuth();
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(true);
@@ -159,27 +169,60 @@ export default function MentorApplication() {
         const res = await fetch(`${base}/api/mentor/application`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        
         const data = await res.json();
         setAppStatus(data);
         
         // If application is already submitted, show submitted screen
-        if (data.status === "submitted") {
+        if (data.status === "submitted" || data.status === "approved") {
           setSubmitted(true);
           return;
         }
         
-        // Move to appropriate step based on completion
-        if (data.step3Completed) setStep(4);
-        else if (data.step2Completed) setStep(3);
-        else if (data.step1Completed) setStep(2);
+        // Check if user is already approved
+        if (user?.verificationStatus === "approved") {
+          navigate("/mentor/dashboard", { replace: true });
+          return;
+        }
+        
+        // If no application exists (status is "not_started" or no id), start at step 1
+        if (!data.id || data.status === "not_started") {
+          setStep(1);
+          return;
+        }
+        
+        // Load existing data into form if available
+        if (data.phoneNumber) setFormData(f => ({ ...f, phoneNumber: data.phoneNumber || "" }));
+        if (data.location) setFormData(f => ({ ...f, location: data.location || "" }));
+        if (data.gender) setFormData(f => ({ ...f, gender: data.gender || "" }));
+        if (data.jobTitle) setFormData(f => ({ ...f, jobTitle: data.jobTitle || "" }));
+        if (data.company) setFormData(f => ({ ...f, company: data.company || "" }));
+        if (data.yearsExperience) setFormData(f => ({ ...f, yearsExperience: String(data.yearsExperience) }));
+        if (data.linkedinUrl) setFormData(f => ({ ...f, linkedinUrl: data.linkedinUrl || "" }));
+        if (data.skills) setFormData(f => ({ ...f, skills: data.skills || [] }));
+        if (data.professionalBio) setFormData(f => ({ ...f, professionalBio: data.professionalBio || "" }));
+        
+        // Respect explicit step=1 from registration flow
+const forcedStep = searchParams.get("step");
+if (forcedStep === "1") {
+  setStep(1);
+  return;
+}
+
+// Otherwise continue auto-resume logic
+if (data.step3Completed) setStep(4);
+else if (data.step2Completed) setStep(3);
+else if (data.step1Completed) setStep(2);
       } catch (err) {
         console.error("Failed to load status:", err);
+        // Default to step 1 on error
+        setStep(1);
       } finally {
         setLoading(false);
       }
     };
     loadStatus();
-  }, []);
+  }, [user, searchParams]);
 
   const update = (field: keyof FormData, value: any) =>
     setFormData((f) => ({ ...f, [field]: value }));
@@ -238,7 +281,6 @@ export default function MentorApplication() {
       const token = await getAccessToken();
 
       if (step === 1) {
-        // Submit Step 1
         const res = await fetch(`${base}/api/mentor/apply/step1`, {
           method: "POST",
           headers: {
@@ -257,7 +299,6 @@ export default function MentorApplication() {
         toast.success("Personal information saved!");
         setStep(nextStep);
       } else if (step === 2) {
-        // Submit Step 2
         const res = await fetch(`${base}/api/mentor/apply/step2`, {
           method: "POST",
           headers: {
@@ -279,7 +320,6 @@ export default function MentorApplication() {
         toast.success("Professional information saved!");
         setStep(nextStep);
       } else if (step === 3) {
-        // Upload documents and submit Step 3
         let idUrl = "";
         let certUrl = "";
         if (formData.idDocument) {
@@ -323,13 +363,6 @@ export default function MentorApplication() {
       const base = getApiUrl();
       const token = await getAccessToken();
 
-      // Get full application for verification
-      const reviewRes = await fetch(`${base}/api/mentor/application/review`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!reviewRes.ok) throw new Error("Failed to get application");
-
-      // Submit final application
       const res = await fetch(`${base}/api/mentor/apply/step4`, {
         method: "POST",
         headers: {

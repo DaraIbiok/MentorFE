@@ -23,5 +23,5 @@ export default defineConfig({
     },
     chunkSizeWarningLimit: 600,
   },
-  base: process.env.VITE_BASE_PATH || '/MentorFE',
+  // base: process.env.VITE_BASE_PATH || '/MentorFE',
 })

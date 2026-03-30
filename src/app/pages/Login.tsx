@@ -35,7 +35,7 @@ export default function Login() {
           ? "/dashboard"
           : user.role === "mentor"
             ? (user as any).verificationStatus === "pending"
-              ? "/mentor/pending"
+              ? "/mentor/apply?step=1"
           : "/mentor/dashboard"
         : "/admin/dashboard";
       const destination =

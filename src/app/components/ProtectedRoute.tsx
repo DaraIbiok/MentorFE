@@ -37,9 +37,8 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     (user as any).verificationStatus === "pending";
 
   if (isPendingMentor && !allowedPendingPaths.some(p => location.pathname.startsWith(p))) {
-    // If they haven't submitted the full application yet, send to apply
-    return <Navigate to="/mentor/pending" replace />;
-  }
+  return <Navigate to="/mentor/apply?step=1" replace />;
+}
 
   if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
     return <Navigate to={DASHBOARD_BY_ROLE[user.role]} replace />;

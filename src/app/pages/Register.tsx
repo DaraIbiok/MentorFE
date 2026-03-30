@@ -84,7 +84,7 @@ export default function Register() {
       } else if (role === "mentor") {
         // Mentor should continue directly to application even if confirmation flow is not immediate
         toast.success("Account created! Continue to mentor application.");
-        navigate("/mentor/apply", { replace: true });
+        navigate("/mentor/apply?step=1", { replace: true });
       } else {
         toast.success("Check your email to confirm your account, then sign in.");
         navigate("/login", { replace: true });
